@@ -101,7 +101,7 @@ de.res$Swab.Lieberman <- de.edger(mat, dat1$pheno, ~virus+batch, coef="viruspos"
 
 # 7. Xiong et al. (human patient BALF samples), the DE result provided by the authors was used
 
-tmp <- fread("../data/xiong.tsv")
+tmp <- fread("../data/xiong.de.tsv")
 de.res$BALF <- setnames(tmp, c("Name","log2FoldChange","pvalue"), c("id","log.fc","pval"))
 
 
@@ -149,5 +149,5 @@ gs2 <- readRDS("../data/c2.cp.reactome.v7.0.symbols.RDS")
 gsea.res <- lapply(de.res, function(x) rbind(gsea(x, gs1), gsea(x, gs2))[order(padj,pval)])
 
 
-save(de.res, gsea.res, file="collected.de.and.gsea.res.RData")
+save(de.res, gsea.res, file="de.and.gsea.res.RData")
 
