@@ -8,13 +8,13 @@ Cheng et al. Genome-scale metabolic modeling reveals SARS-CoV-2-induced host met
 
 ### Softwares
 
-* R 3.6
+* R 3.6 (R 3.6.3 was used in our study)
 * R packages
   - ImNotaGit/my.utils
   - ruppinlab/Rcplex2: required to run genome-scale metabolic modeling (GEM); otherwise may be omitted
   - ruppinlab/gembox
   - other needed packages can be obtained from CRAN or Bioconductor, please see the R scripts
-* IBM ILOG CPLEX Optimization Studio 12: required to run GEM; otherwise may be omitted
+* IBM ILOG CPLEX Optimization Studio or Gurobi: required to run GEM; otherwise may be omitted (CPLEX 12.10 was used in our study)
 
 ### Data
 
