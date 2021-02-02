@@ -13,7 +13,7 @@ tmp <- lapply(fns, readRDS)
 df.res <- lapply(tmp, function(x) x$rxn)
 df.met.res <- lapply(tmp, function(x) x$met)
 df.tx.res <- lapply(tmp, function(x) x$tx)
-save(df.res, df.met.res, df.tx.res, file="collected.dflux.res.RData")
+save(df.res, df.met.res, df.tx.res, file="dflux.res.RData")
 
 ### 2. MTA results
 

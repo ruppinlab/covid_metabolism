@@ -1,0 +1,12 @@
+Rscript imat.and.mta.R NHBE 0 0.05
+Rscript imat.and.mta.R Calu-3 0 0.1
+Rscript imat.and.mta.R A549 1 0
+Rscript imat.and.mta.R Vero 0 0.05
+Rscript imat.and.mta.R 293T 0 0.05
+Rscript imat.and.mta.R Caco-2 1 0
+Rscript imat.and.mta.R Swab.Butler 0 0.05
+Rscript imat.and.mta.R Swab.Lieberman 0 0
+Rscript imat.and.mta.R BALF 0 0
+Rscript imat.and.mta.R SC.Liao 0 0.05
+Rscript imat.and.mta.R SC.Chua.Basal 0 0
+Rscript imat.and.mta.R SC.Chua.Ciliated 0 0.05
