@@ -36,6 +36,7 @@ All required data should be saved in this folder.
 Scripts for gene expression-level analysis: 
 
 * de.and.gsea.R: differential expression (DE) and gene set enrichment analysis (GSEA) between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
+* de.and.gsea.remdesivir.R: DE and GSEA analysis for the Vero E6 cell remdesivir treatment data
 
 ### GEM
 
@@ -45,6 +46,16 @@ Scripts for genome-scale metabolic modeling (GEM) analysis:
 * imat.and.mta.R: run iMAT and MTA on each dataset
 * dflux.R: differential flux analysis between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
 * collect.results.R: collect the differential flux analysis and MTA results across datasets
+
+### GEM_remdesivir
+
+Scripts for GEM analysis on the Vero E6 cell remdesivir treatment data
+
+* prepare.data.R: prepare data for GEM
+* imat.R: run iMAT for each experimental group
+* mta.R: run MTA for pairs of experimental groups
+* dflux.R: differential flux analysis between pairs of experimental groups
+* collect.results.R: collect the differential flux analysis and MTA results
 
 ### analyze_results
 
