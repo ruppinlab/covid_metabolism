@@ -50,5 +50,6 @@ Scripts for genome-scale metabolic modeling (GEM) analysis:
 
 Scripts and R notebooks for inspecting the results from various analyses and for validating the MTA predictions:
 
-* sth.R
+* functions.R: various functions, will be sourced in check.mta.results.R
+* check.mta.results.R: various validations and pathway enrichment analysis of MTA results
 
