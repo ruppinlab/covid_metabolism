@@ -12,7 +12,7 @@ dat <- readRDS("data.for.gem.RDS")
 x <- commandArgs(TRUE)
 id <- x[1] # dataset ID
 media <- x[2] # media
-bm.lb <- as.numeric(x[2]) # minimal biomass requirement
+bm.lb <- as.numeric(x[3]) # minimal biomass requirement
 
 exprs.int <- dat$exprs.int[[id]]
 dflux.int <- dat$dflux.int[[id]]

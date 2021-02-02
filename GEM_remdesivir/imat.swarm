@@ -1,0 +1,4 @@
+Rscript imat.R ctrl
+Rscript imat.R drug
+Rscript imat.R virus
+Rscript imat.R virus_drug
