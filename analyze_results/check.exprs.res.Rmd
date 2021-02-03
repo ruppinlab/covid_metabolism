@@ -1,0 +1,460 @@
+---
+title: "Check gene expression-level analysis results"
+output: html_notebook
+---
+
+```{r}
+library(my.utils)
+library(gembox)
+library(ComplexHeatmap)
+library(rio)
+```
+
+```{r}
+load("../expression/de.and.gsea.res.RData")
+```
+
+### Comparison of DE genes from different datasets
+
+```{r}
+tmpf <- function(a,b) {
+  mapply(function(i,j) {
+    gns <- intersect(de.res[[i]]$id, de.res[[j]]$id)
+    cor(de.res[[i]][match(gns,id), log.fc], de.res[[j]][match(gns,id), log.fc], method="s", use="c")
+  }, a, b) # have to use mapply, as for outer() the function has to be vectorized
+}
+tmpf1 <- function(a,b) {
+  mapply(function(i,j) {
+    gns <- intersect(de.res[[i]]$id, de.res[[j]]$id)
+    cor.test(de.res[[i]][match(gns,id), log.fc], de.res[[j]][match(gns,id), log.fc], method="s", use="c")$p.value
+  }, a, b) # have to use mapply, as for outer() the function has to be vectorized
+}
+ds <- names(de.res)
+names(ds) <- ds
+cor.mat <- outer(ds, ds, tmpf)
+p1.mat <- outer(ds, ds, tmpf1)
+p1.mat[upper.tri(p1.mat)] <- p.adjust(p1.mat[upper.tri(p1.mat)], "BH")
+p1.mat[lower.tri(p1.mat)] <- p.adjust(p1.mat[lower.tri(p1.mat)], "BH")
+```
+
+PCA plot of inverse normal transformed log.fc values:
+
+```{r, fig.width=1.5, fig.height=1.4}
+gns <- Reduce(intersect, lapply(de.res, function(x) x[!is.na(log.fc), id]))
+lfc.mat <- t(sapply(de.res, function(x) x[match(gns,id), inv.norm(log.fc)]))
+plot.pca(lfc.mat, label=ds)
+```
+
+
+Number of padj<0.1 DE genes per dataset:
+
+```{r}
+sapply(de.res, function(x) c(nrow(x), x[padj<0.1, .N]))
+```
+
+Pair-wise enrichment of top DE genes, use top 400 genes to be more uniform:
+
+```{r}
+tmpf <- function(a,b) {
+  mapply(function(i,j) {
+    gns <- intersect(de.res[[i]]$id, de.res[[j]]$id)
+    #enrich.test(de.res[[i]][id %in% gns][p.adjust(pval,"BH")<0.05, id], de.res[[j]][id %in% gns][p.adjust(pval,"BH")<0.05, id], gns, alternative="greater")$estimate
+    enrich.test(de.res[[i]][id %in% gns][order(pval), id[1:400]], de.res[[j]][id %in% gns][order(pval), id[1:400]], gns, alternative="greater")$estimate
+  }, a, b) # have to use mapply, as for outer() the function has to be vectorized
+}
+tmpf1 <- function(a,b) {
+  mapply(function(i,j) {
+    gns <- intersect(de.res[[i]]$id, de.res[[j]]$id)
+    #enrich.test(de.res[[i]][id %in% gns][p.adjust(pval,"BH")<0.05, id], de.res[[j]][id %in% gns][p.adjust(pval,"BH")<0.05, id], gns, alternative="greater")$p.value
+    enrich.test(de.res[[i]][id %in% gns][order(pval), id[1:400]], de.res[[j]][id %in% gns][order(pval), id[1:400]], gns, alternative="greater")$p.value
+  }, a, b) # have to use mapply, as for outer() the function has to be vectorized
+}
+ds <- names(de.res)
+names(ds) <- ds
+or.mat <- outer(ds, ds, tmpf)
+p.mat <- outer(ds, ds, tmpf1)
+p.mat[upper.tri(p.mat)] <- p.adjust(p.mat[upper.tri(p.mat)], "BH")
+p.mat[lower.tri(p.mat)] <- p.adjust(p.mat[lower.tri(p.mat)], "BH")
+```
+
+```{r}
+plot.mat <- function(mat, pmat) {
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  mat <- mat[cl$order, ][, cl$order]
+  pmat <- pmat[cl$order, ][, cl$order]
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  diag(mat) <- NA
+  diag(pmat) <- 0
+  pmat <- -log10(pmat)
+  colf <- circlize::colorRamp2(c(0, -log10(0.05), median(pmat[is.finite(pmat)]), max(pmat[is.finite(pmat)])), c("grey70", "blue", "purple", "red"))
+  rf <- function(i=NULL,j=NULL,x=NULL) {
+    rmax <- 0.5
+    rmin <- 0.2
+    xmax <- max(mat[is.finite(mat)])
+    if (is.null(x)) x <- mat[i,j]
+    if (is.na(x)) res <- NA else if (x>=1) res <- rmin + (rmax-rmin)*(x-1)/(xmax-1) else res <- 0.05 + (0.2-0.05)*x
+    if (is.na(res)) NA else res*unit(3,"mm")
+  }
+  cellf <- function(j, i, x, y, width, height, fill) {
+    grid.rect(x=x, y=y, width=width, height=height, gp=gpar(col=NA, fill=NA))
+    #grid.circle(x=x, y=y, r=mat[i,j]/max(mat,na.rm=TRUE)/2*min(unit.c(width,height)), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+    if (is.infinite(mat[i,j])) grid.circle(x=x, y=y, r=rf(x=max(mat[is.finite(mat)])), gp=gpar(fill=colf(pmat[i,j]), col="black"))
+    else grid.circle(x=x, y=y, r=rf(i,j), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+  }
+  hm <- Heatmap(pmat,
+    #name="-log10(padj)",
+    width=ncol(pmat)*unit(4,"mm"),
+    height=nrow(pmat)*unit(4,"mm"),
+    row_title=NULL,
+    #row_title_gp=gpar(fontsize=9),
+    row_names_gp=gpar(fontsize=8),
+    row_names_side="left",
+    cluster_rows=cl,
+    row_dend_side="right",
+    row_dend_width=unit(6,"mm"),
+    column_title=NULL,
+    #column_title_gp=gpar(fontsize=9),
+    column_title_side="bottom",
+    column_names_gp=gpar(fontsize=8),
+    column_names_rot=40,
+    cluster_columns=cl,
+    column_dend_height=unit(6,"mm"),
+    col=colf,
+    rect_gp=gpar(type="none"),
+    cell_fun=cellf,
+    show_heatmap_legend=FALSE
+    #heatmap_legend_param=list(title_gp=gpar(fontsize=6),
+    #                          labels_gp=gpar(fontsize=6),
+    #                          grid_width=unit(3,"mm"))
+  )
+  lgd1 <- Legend(col_fun=colf, title=expression(-log[10]*P[adj]), title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"))
+  lgd2 <- Legend(title="Odds Ratio", labels=c(10,5,1),
+    title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"),
+    graphics=list(function(x, y, w, h) grid.circle(x, y, r=rf(x=10), gp=gpar(fill="grey", col=NA)), # requires the dev version of ComplexHeatmap
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=5), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=1), gp=gpar(fill="grey", col=NA)))
+  )
+  lgd <- packLegend(lgd1, lgd2)
+  draw(hm, annotation_legend_list=lgd)
+}
+```
+
+```{r, fig.width=2.35, fig.height=1.5, warning=FALSE}
+plot.mat(or.mat, p.mat)
+```
+
+
+### top enriched pathways based on DE from different datasets
+
+```{r}
+sapply(gsea.res, function(x) x[padj<0.1, .N])
+```
+
+Pair-wise overlap (enrichment by Fisher's test) of the top enriched DE pathways in both direction combined:
+
+```{r}
+#tmpf <- function(a,b) mapply(function(i,j) enrich.test(gsea.res[[i]][order(padj,pval)][1:max(50, sum(padj<0.05,na.rm=TRUE)), pathway], gsea.res[[j]][order(padj,pval)][1:max(50, sum(padj<0.05,na.rm=TRUE)), pathway], intersect(gsea.res[[i]]$pathway, gsea.res[[j]]$pathway), alternative="greater", confus.mat=NULL)$estimate, a, b) # didn't use padj because different datsets have hugely different numbers of significant genes at the same padj cutoff
+tmpf <- function(a,b) mapply(function(i,j) enrich.test(gsea.res[[i]][padj<0.1, pathway], gsea.res[[j]][padj<0.1, pathway], intersect(gsea.res[[i]]$pathway, gsea.res[[j]]$pathway), alternative="greater")$estimate, a, b)
+tmpf1 <- function(a,b) mapply(function(i,j) enrich.test(gsea.res[[i]][padj<0.1, pathway], gsea.res[[j]][padj<0.1, pathway], intersect(gsea.res[[i]]$pathway, gsea.res[[j]]$pathway), alternative="greater")$p.value, a, b)
+ds <- names(de.res)
+names(ds) <- ds
+gs.or.mat <- outer(ds, ds, tmpf)
+gs.p.mat <- outer(ds, ds, tmpf1)
+gs.p.mat[upper.tri(gs.p.mat)] <- p.adjust(gs.p.mat[upper.tri(gs.p.mat)], "BH")
+gs.p.mat[lower.tri(gs.p.mat)] <- p.adjust(gs.p.mat[lower.tri(gs.p.mat)], "BH")
+```
+
+```{r}
+plot.mat <- function(mat, pmat) {
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  mat <- mat[cl$order, ][, cl$order]
+  pmat <- pmat[cl$order, ][, cl$order]
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  diag(mat) <- NA
+  diag(pmat) <- 0
+  pmat <- -log10(pmat)
+  colf <- circlize::colorRamp2(c(0, -log10(0.05), median(pmat[is.finite(pmat)]), max(pmat[is.finite(pmat)])), c("grey70", "blue", "purple", "red"))
+  rf <- function(i=NULL,j=NULL,x=NULL) {
+    rmax <- 0.5
+    rmin <- 0.2
+    xmax <- max(mat[is.finite(mat)])
+    if (is.null(x)) x <- mat[i,j]
+    if (is.na(x)) res <- NA else if (x>=1) res <- rmin + (rmax-rmin)*(x-1)/(xmax-1) else res <- 0.05 + (0.2-0.05)*x
+    if (is.na(res)) NA else res*unit(3,"mm")
+  }
+  cellf <- function(j, i, x, y, width, height, fill) {
+    grid.rect(x=x, y=y, width=width, height=height, gp=gpar(col=NA, fill=NA))
+    #grid.circle(x=x, y=y, r=mat[i,j]/max(mat,na.rm=TRUE)/2*min(unit.c(width,height)), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+    if (is.infinite(mat[i,j])) grid.circle(x=x, y=y, r=rf(x=max(mat[is.finite(mat)])), gp=gpar(fill=colf(pmat[i,j]), col="black"))
+    else grid.circle(x=x, y=y, r=rf(i,j), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+  }
+  hm <- Heatmap(pmat,
+    #name="-log10(padj)",
+    width=ncol(pmat)*unit(4,"mm"),
+    height=nrow(pmat)*unit(4,"mm"),
+    row_title=NULL,
+    #row_title_gp=gpar(fontsize=9),
+    row_names_gp=gpar(fontsize=8),
+    row_names_side="left",
+    cluster_rows=cl,
+    row_dend_side="right",
+    row_dend_width=unit(10,"mm"),
+    column_title=NULL,
+    #column_title_gp=gpar(fontsize=9),
+    column_title_side="bottom",
+    column_names_gp=gpar(fontsize=8),
+    column_names_rot=40,
+    cluster_columns=cl,
+    column_dend_height=unit(10,"mm"),
+    col=colf,
+    rect_gp=gpar(type="none"),
+    cell_fun=cellf,
+    show_heatmap_legend=FALSE
+    #heatmap_legend_param=list(title_gp=gpar(fontsize=6),
+    #                          labels_gp=gpar(fontsize=6),
+    #                          grid_width=unit(3,"mm"))
+  )
+  lgd1 <- Legend(col_fun=colf, title=expression(-log[10]*P[adj]), title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"))
+  lgd2 <- Legend(title="Odds Ratio", labels=c(Inf,30,15,1),
+    title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"),
+    graphics=list(function(x, y, w, h) grid.circle(x, y, r=rf(x=30), gp=gpar(fill="grey", col="black")),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=30), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=15), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=1), gp=gpar(fill="grey", col=NA)))
+  )
+  lgd <- packLegend(lgd1, lgd2)
+  draw(hm, annotation_legend_list=lgd)
+}
+```
+
+```{r, fig.width=2.35, fig.height=1.5, warning=FALSE}
+plot.mat(gs.or.mat, gs.p.mat)
+```
+
+Pathways enriched in at least one single-cell dataset and at least one in vivo bulk dataset (with consistent direction), excluding those showing signifiant enrichment in the opposite direction in any of the other datasets:
+
+```{r}
+gsets.pos <- unique(setdiff(
+  intersect(
+    rbindlist(gsea.res[c("SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[padj<0.1 & ES>0, pathway],
+    rbindlist(gsea.res[c("Swab.Butler","Swab.Lieberman","BALF")])[padj<0.1 & ES>0, pathway]
+  ),
+  rbindlist(gsea.res)[padj<0.1 & ES<0, pathway]
+))
+gsets.pos
+```
+
+```{r}
+gsets.neg <- unique(setdiff(
+  intersect(
+    rbindlist(gsea.res[c("SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[padj<0.1 & ES<0, pathway],
+    rbindlist(gsea.res[c("Swab.Butler","Swab.Lieberman","BALF")])[padj<0.1 & ES<0, pathway]
+  ),
+  rbindlist(gsea.res)[padj<0.1 & ES>0, pathway]
+))
+gsets.neg
+```
+
+We can see that the negative enrichment side contains many metabolic pathways. Visualization below. Ranked by fisher's method statistics (-2*sum logP)
+
+```{r}
+tmp <- intersect(gsets.pos, gsets.neg)
+gsets.pos <- setdiff(gsets.pos, tmp)
+gsets.neg <- setdiff(gsets.neg, tmp)
+
+tmpf <- function(gs) {
+  p <- sapply(gsea.res, function(x) x[match(gs, pathway), padj])
+  rp <- sapply(gsea.res, function(x) x[match(gs, pathway), pval])
+  stat <- -2*rowSums(log(rp), na.rm=TRUE)
+  nes <- sapply(gsea.res, function(x) x[match(gs, pathway), NES])
+  gs[gs=="REACTOME_RESPIRATORY_ELECTRON_TRANSPORT_ATP_SYNTHESIS_BY_CHEMIOSMOTIC_COUPLING_AND_HEAT_PRODUCTION_BY_UNCOUPLING_PROTEINS"] <- "REACTOME_RESPIRATORY_ELECTRON_TRANSPORT_ATP_SYNTHESIS..."
+  gs[gs=="REACTOME_THE_CITRIC_ACID_TCA_CYCLE_AND_RESPIRATORY_ELECTRON_TRANSPORT"] <- "REACTOME_THE_TCA_CYCLE_AND_RESPIRATORY_ELECTRON_TRANSPORT"
+  gs[gs=="REACTOME_ANTIGEN_PRESENTATION:_FOLDING_ASSEMBLY_AND_PEPTIDE_LOADING_OF_CLASS_I_MHC"] <- "REACTOME_ANTIGEN_PRESENTATION_..._CLASS_I_MHC"
+  gs <- sapply(str_split(gs, "_"), function(x) str_to_sentence(paste(x[-1], collapse=" ")))
+  tmp <- c("Gpcr","Rig i","Jak stat","dna","Oas","atp","tca","i mhc")
+  gs <- str_replace_all(gs, paste(tmp,collapse="|"), function(x) toupper(x))
+  
+  warning(sum(duplicated(gs)), " duplicates")
+  tmp <- !duplicated(gs)
+  o <- order(-stat[tmp])
+  gs <- gs[tmp][o]
+  p <- p[tmp,][o,]
+  nes <- nes[tmp,][o,]
+  rownames(p) <- gs
+  rownames(nes) <- gs
+  list(nes=t(nes), p=t(p))
+}
+
+# neet to use dev version of ComplexHeatmap
+plot.mat <- function() {
+  pos <- tmpf(gsets.pos)
+  neg <- tmpf(gsets.neg)
+  mat <- cbind(pos$nes[,1:15], NA, neg$nes[,1:15])
+  pmat <- cbind(pos$p[,1:15], NA, neg$p[,1:15])
+  pmat <- -log10(pmat)
+  colf.pos <- circlize::colorRamp2(c(0, -log10(0.05), max(pmat[is.finite(pmat)])), c("grey70", "orange", "red"))
+  colf.neg <- circlize::colorRamp2(c(0, -log10(0.05), max(pmat[is.finite(pmat)])), c("grey70", "purple", "blue"))
+  rf <- function(i=NULL,j=NULL,x=NULL) {
+    rmax <- 0.5
+    rmin <- 0.2
+    xmax <- max(abs(mat), na.rm=TRUE)
+    xmin <- min(abs(mat), na.rm=TRUE)
+    if (is.null(x)) x <- abs(mat[i,j])
+    if (is.na(x)) res <- NA else res <- rmin + (rmax-rmin)*(x-xmin)/(xmax-xmin)
+    if (is.na(res)) NA else res*unit(3,"mm")
+  }
+  cellf <- function(j, i, x, y, width, height, fill) {
+    grid.rect(x=x, y=y, width=width, height=height, gp=gpar(col=NA, fill=NA))
+    #grid.circle(x=x, y=y, r=mat[i,j]/max(mat,na.rm=TRUE)/2*min(unit.c(width,height)), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+    if (!is.na(mat[i,j]) && mat[i,j]>=0) grid.circle(x=x, y=y, r=rf(i,j), gp=gpar(fill=colf.pos(pmat[i,j]), col=NA))
+    else if (!is.na(mat[i,j]) && mat[i,j]<0) grid.circle(x=x, y=y, r=rf(i,j), gp=gpar(fill=colf.neg(pmat[i,j]), col=NA))
+  }
+  hm <- Heatmap(pmat,
+    #name="-log10(padj)",
+    width=ncol(pmat)*unit(5.5,"mm"),
+    height=nrow(pmat)*unit(5.5,"mm"),
+    row_title="Dataset",
+    row_title_gp=gpar(fontsize=10),
+    row_names_gp=gpar(fontsize=9),
+    row_names_side="left",
+    row_dend_side="left",
+    row_dend_width=unit(6,"mm"),
+    column_title=NULL,
+    #column_title_gp=gpar(fontsize=9),
+    column_title_side="bottom",
+    column_names_gp=gpar(fontsize=9),
+    column_names_rot=40,
+    cluster_columns=FALSE,
+    #column_dend_height=unit(6,"mm"),
+    #col=colf,
+    rect_gp=gpar(type="none"),
+    cell_fun=cellf,
+    show_heatmap_legend=FALSE
+    #heatmap_legend_param=list(title_gp=gpar(fontsize=6),
+    #                          labels_gp=gpar(fontsize=6),
+    #                          grid_width=unit(3,"mm"))
+  )
+  lgd1 <- Legend(col_fun=colf.pos, title=expression(-log[10]*P[adj]), title_gp=gpar(fontsize=9, fontface="plain"), labels_gp=gpar(fontsize=8, fontface="plain"))
+  lgd2 <- Legend(col_fun=colf.neg, title=expression(-log[10]*P[adj]), title_gp=gpar(fontsize=9, fontface="plain", col="white"), labels_gp=gpar(fontsize=8, fontface="plain"))
+  lgd3 <- Legend(title="NES", labels=c(2,1,0.5),
+    title_gp=gpar(fontsize=9, fontface="plain"), labels_gp=gpar(fontsize=8, fontface="plain"),
+    graphics=list(function(x, y, w, h) grid.circle(x, y, r=rf(x=2), gp=gpar(fill="red", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=1), gp=gpar(fill="red", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=0.5), gp=gpar(fill="red", col=NA)))
+  )
+  lgd4 <- Legend(title="NES", labels=c(-2,-1,-0.5),
+    title_gp=gpar(fontsize=9, fontface="plain", col="white"), labels_gp=gpar(fontsize=8, fontface="plain"),
+    graphics=list(function(x, y, w, h) grid.circle(x, y, r=rf(x=2), gp=gpar(fill="blue", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=1), gp=gpar(fill="blue", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=0.5), gp=gpar(fill="blue", col=NA)))
+  )
+  lgd <- packLegend(lgd1, lgd3, lgd2, lgd4, max_height=unit(6,"cm"), column_gap=unit(0.1,"mm"))
+  draw(hm, annotation_legend_list=lgd)
+}
+```
+
+```{r, fig.width=4.8, fig.height=2.4, warning=FALSE}
+plot.mat()
+```
+
+Plot heatmap of kegg metabolic pathways:
+
+```{r}
+# gsea for only KEGG metabolic gene sets
+#gsets.metab.kegg <- readRDS("../data/kegg.pathway.metabolism.gsets.RDS")
+#gsea.res.metab.kegg <- lapply(de.res, gsea, gsets=gsets.metab.kegg)
+#saveRDS(gsea.res.metab.kegg, file="gsea.res.metabolism.kegg.RDS")
+gsea.res.metab.kegg <- readRDS("gsea.res.metabolism.kegg.RDS")
+```
+
+```{r, fig.width=4, fig.height=1.6}
+tmp <- Reduce(union, lapply(gsea.res.metab.kegg, function(x) x[padj<0.2, pathway]))
+anno <- fread("~/Documents/Data/KEGG/metabolic.pathways.tsv")
+#all(tmp %in% anno$name) #TRUE
+anno <- anno[!category %in% c("Metabolism of terpenoids and polyketides","Biosynthesis of other secondary metabolites","Xenobiotics biodegradation and metabolism") & name %in% tmp]
+anno[, category:=factor(category, levels=c("Energy metabolism","Carbohydrate metabolism","Lipid metabolism","Amino acid metabolism","Metabolism of other amino acids","Nucleotide metabolism","Glycan biosynthesis and metabolism","Metabolism of cofactors and vitamins"))]
+anno <- anno[order(category)]
+tmp <- anno$name
+nes.mat.metab <- t(sapply(gsea.res.metab.kegg, function(x) x[match(tmp,pathway), NES]))
+p.mat.metab <- t(sapply(gsea.res.metab.kegg, function(x) x[match(tmp,pathway), padj]))
+colnames(nes.mat.metab) <- tmp
+colnames(p.mat.metab) <- tmp
+
+cols <- colorRampPalette(RColorBrewer::brewer.pal(8,"Set1"))(uniqueN(anno$category))
+names(cols) <- unique(anno$category)
+ha <- HeatmapAnnotation(df=anno[,.(category)],
+                        col=list(category=cols),
+                        simple_anno_size=unit(2,"mm"),
+                        show_annotation_name=FALSE,
+                        annotation_legend_param=list(category=list(direction="horizontal",
+                                                                   ncol=1,
+                                                                   grid_width=unit(2,"mm"),
+                                                                   #grid_height=unit(2,"mm"),
+                                                                   title="Pathway Category",
+                                                                   title_gp=gpar(fontsize=7, fontface="plain"),
+                                                                   labels_gp=gpar(fontsize=6))))
+
+#cellf <- function(j, i, x, y, width, height, fill) if (p.mat.metab[i,j]<0.1) grid.circle(x=x, y=y, r=unit(0.1,"mm"), gp=gpar(fill="black", col="black"))
+
+a <- Heatmap(nes.mat.metab,
+        name="NES",
+        row_title="Dataset",
+        row_title_gp=gpar(fontsize=8),
+        row_names_gp=gpar(fontsize=7),
+        row_names_side="left",
+        row_dend_side="left",
+        row_dend_width=unit(3,"mm"),
+        column_title="Metabolic Pathway",
+        column_title_side="bottom",
+        column_title_gp=gpar(fontsize=8),
+        column_names_gp=gpar(fontsize=6),
+        column_names_rot=45,
+        column_split=anno$category,
+        show_column_dend=FALSE,
+        #column_dend_height=unit(3,"mm"),
+        #cell_fun=cellf,
+        bottom_annotation=ha,
+        heatmap_legend_param=list(#legend_direction="horizontal", # bug here with dev version; works with Bioc version
+                                  #grid_height=unit(2,"mm"),
+                                  grid_width=unit(2.5,"mm"),
+                                  title="NES",
+                                  title_gp=gpar(fontsize=7, fontface="plain"),
+                                  labels_gp=gpar(fontsize=6))
+)
+#draw(a, annotation_legend_side="bottom", heatmap_legend_side="bottom", merge_legend=TRUE)
+draw(a, merge_legend=TRUE)
+```
+
+Export tables:
+
+```{r}
+tmp <- lapply(de.res, function(x) x[id!="", .(gene=id, log.fold.change=log.fc, p.value=pval, adjusted.p.value=padj)])
+rio::export(tmp, "../gem_manuscript/Table S1_SARS-CoV-2-infected compared to control differential expression results for each dataset.xlsx")
+
+tmp <- gsea.res.metab.kegg
+names(tmp) <- paste0(names(tmp), "_KEGG_Metabolism")
+tmp <- c(gsea.res, tmp)
+rio::export(tmp, "../gem_manuscript/Table S2_SARS-CoV-2-infected compared to control GSEA results for each dataset.xlsx")
+
+tmpf <- function(gs) {
+  nes <- lapply(gsea.res, function(x) x[match(gs, pathway), NES])
+  names(nes) <- paste0(names(nes), "_NES")
+  padj <- lapply(gsea.res, function(x) x[match(gs, pathway), padj])
+  names(padj) <- paste0(names(padj), "_padj")
+  res <- as.data.table(c(nes, padj)[c(matrix(1:(length(nes)*2), nrow=2, byrow=TRUE))])
+  cbind(pathway=gs, res)
+}
+tmp <- list(positive=tmpf(gsets.pos), negative=tmpf(gsets.neg))
+rio::export(tmp, "../gem_manuscript/Table S3_SARS-CoV-2-infected compared to control most consistently altered gene sets from GSEA across datasets.xlsx")
+```
+
+
+

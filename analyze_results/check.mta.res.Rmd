@@ -1,0 +1,327 @@
+---
+title: "Check MTA predictions"
+output: html_notebook
+---
+
+```{r}
+library(my.utils)
+library(gembox)
+library(ComplexHeatmap)
+library(venn)
+library(rio)
+```
+
+```{r}
+mta.res <- readRDS("../GEM/mta.res.RDS")
+load("check.mta.res.RData")
+```
+
+
+### Comparison of top MTA predicted target reactions between pairs of datasets
+
+```{r}
+tmpf <- function(a,b) mapply(function(i,j) enrich.test(top10.mta.hits[[i]]$reaction, top10.mta.hits[[j]]$reaction, recon1$rxns, alternative="greater", confus.mat=NULL)$estimate, a, b)
+tmpf1 <- function(a,b) mapply(function(i,j) enrich.test(top10.mta.hits[[i]]$reaction, top10.mta.hits[[j]]$reaction, recon1$rxns, alternative="greater", confus.mat=NULL)$p.value, a, b)
+ds <- names(mta.res)
+names(ds) <- ds
+or.mat <- outer(ds, ds, tmpf)
+p.mat <- outer(ds, ds, tmpf1)
+p.mat[upper.tri(p.mat)] <- p.adjust(p.mat[upper.tri(p.mat)], "BH")
+p.mat[lower.tri(p.mat)] <- p.adjust(p.mat[lower.tri(p.mat)], "BH")
+```
+
+```{r}
+plot.mat <- function(mat, pmat) {
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  mat <- mat[cl$order, ][, cl$order]
+  pmat <- pmat[cl$order, ][, cl$order]
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  diag(mat) <- NA
+  diag(pmat) <- 0
+  pmat <- -log10(pmat)
+  colf <- circlize::colorRamp2(c(0, -log10(0.05), median(pmat[is.finite(pmat)]), max(pmat[is.finite(pmat)])), c("grey70", "blue", "purple", "red"))
+  rf <- function(i=NULL,j=NULL,x=NULL) {
+    rmax <- 0.5
+    rmin <- 0.2
+    xmax <- max(mat[is.finite(mat)])
+    if (is.null(x)) x <- mat[i,j]
+    if (is.na(x)) res <- NA else if (x>=1) res <- rmin + (rmax-rmin)*(x-1)/(xmax-1) else res <- 0.05 + (0.2-0.05)*x
+    if (is.na(res)) NA else res*unit(3,"mm")
+  }
+  cellf <- function(j, i, x, y, width, height, fill) {
+    grid.rect(x=x, y=y, width=width, height=height, gp=gpar(col=NA, fill=NA))
+    #grid.circle(x=x, y=y, r=mat[i,j]/max(mat,na.rm=TRUE)/2*min(unit.c(width,height)), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+    if (is.infinite(mat[i,j])) grid.circle(x=x, y=y, r=rf(x=max(mat[is.finite(mat)])), gp=gpar(fill=colf(pmat[i,j]), col="black"))
+    else grid.circle(x=x, y=y, r=rf(i,j), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+  }
+  hm <- Heatmap(pmat,
+    #name="-log10(padj)",
+    width=ncol(pmat)*unit(4,"mm"),
+    height=nrow(pmat)*unit(4,"mm"),
+    row_title=NULL,
+    #row_title_gp=gpar(fontsize=9),
+    row_names_gp=gpar(fontsize=8),
+    row_names_side="left",
+    cluster_rows=cl,
+    row_dend_side="right",
+    row_dend_width=unit(6,"mm"),
+    column_title=NULL,
+    #column_title_gp=gpar(fontsize=9),
+    column_title_side="bottom",
+    column_names_gp=gpar(fontsize=8),
+    column_names_rot=40,
+    cluster_columns=cl,
+    column_dend_height=unit(6,"mm"),
+    col=colf,
+    rect_gp=gpar(type="none"),
+    cell_fun=cellf,
+    show_heatmap_legend=FALSE
+    #heatmap_legend_param=list(title_gp=gpar(fontsize=6),
+    #                          labels_gp=gpar(fontsize=6),
+    #                          grid_width=unit(3,"mm"))
+  )
+  lgd1 <- Legend(col_fun=colf, title=expression(-log[10]*P[adj]), title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"))
+  lgd2 <- Legend(title="Odds Ratio", labels=c(15,8,1),
+    title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"),
+    graphics=list(function(x, y, w, h) grid.circle(x, y, r=rf(x=15), gp=gpar(fill="grey", col=NA)), # requires the dev version of ComplexHeatmap
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=8), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=1), gp=gpar(fill="grey", col=NA)))
+  )
+  lgd <- packLegend(lgd1, lgd2)
+  draw(hm, annotation_legend_list=lgd)
+}
+```
+
+```{r, fig.width=2.35, fig.height=1.5, warning=FALSE}
+plot.mat(or.mat, p.mat)
+```
+
+
+### Several validations
+
+With CRISPR-Cas9 screen hits:
+
+```{r}
+rbindlist(lapply(enr.res10.rxn, function(x) x$screen[reaction.set=="pos.crispr.union"]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval), -"reaction.set"]
+rbindlist(lapply(enr.res20.rxn, function(x) x$screen[reaction.set=="pos.crispr.union"]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval), -"reaction.set"]
+```
+
+Visualization:
+
+```{r, fig.width=2.3, fig.height=1.4}
+tmp <- rbindlist(lapply(enr.res10.rxn, function(x) x$screen[reaction.set=="pos.crispr.union"]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval), -"reaction.set"]
+tmp[, dataset:=factor(dataset, levels=dataset)]
+tmp[, nlp:=-log10(padj)]
+
+p <- ggplot(tmp) +
+  ylab("Odds Ratio") +
+  geom_point(aes(x=dataset, y=odds.ratio, color=nlp, size=overlap.size)) + 
+  scale_color_continuous(low="grey", high="red3", name=expression(-log[10]*P[adj])) + 
+  scale_size_continuous(name="overlap size", range=c(1,4)) +
+  geom_hline(yintercept=1, linetype="dashed", color="grey") +
+  annotate("text", x=1.7, y=1.4, label="odds ratio>1", size=2.8, color="grey30") +
+  theme_classic() +
+  thm(y.tit=10, y.txt=8, x.tit=NULL, x.txt=list(size=8,angle=30,hjust=1), lgd.tit=8, lgd.txt=6, lgd.key=10) + theme(legend.spacing=unit(0,"pt"))
+p
+```
+
+AUROC based on CRISPR-Cas9 screens:
+
+```{r}
+rbindlist(lapply(auc.res, function(x) x$crispr.union), idcol="dataset")[order(-auroc)]
+```
+
+Visualization:
+
+```{r, message=FALSE, fig.width=1.6, fig.height=1}
+# recompute AUROC data with 95% CI for plotting
+tmp <- rbindlist(lapply(mta.res, function(x) {
+  tmp <- get.roc1(x[!is.na(score),score], pos=rxns.screen.for.roc$pos.crispr.union, neg=rxns.screen.for.roc$neg.crispr.union, x.names=x[!is.na(score),reaction], msg=FALSE)
+  data.table(auc=tmp$auc, lb=tmp$auc.ci[1], ub=tmp$auc.ci[2])
+}), idcol="dataset")[order(-auc)]
+tmp[, dataset:=factor(dataset, levels=dataset)]
+
+p <- ggplot(tmp) + scale_y_continuous(name="AUROC", breaks=c(0.3,0.5,0.7,0.9)) +
+  geom_pointrange(aes(x=dataset, y=auc, ymin=lb, ymax=ub, color=auc)) +
+  scale_color_gradient2(low="grey", mid="grey", high="red3", midpoint=0.5) +
+  geom_hline(yintercept=0.5, linetype="dashed", color="grey40") +
+  theme_classic() +
+  thm(x.tit=NULL, x.txt=list(size=8, angle=35, hjust=1), y.tit=10, y.txt=8, lgd="none")
+p
+```
+
+Examine some ROC curves:
+
+```{r}
+# plot ROC curves
+plot.roc1 <- function(ds, ci=TRUE) {
+  dat <- get.roc1(mta.res[[ds]][!is.na(top.percent),100-top.percent], pos=rxns.screen.for.roc$pos.crispr.union, neg=rxns.screen.for.roc$neg.crispr.union, x.names=mta.res[[ds]][!is.na(top.percent),reaction], ci=ci)
+  plot.roc(dat, col=function(x) 100-x, rev.lgd=TRUE, lgd.tit="MTA\nTop%", lab.size=2.8) + ggtitle(ds) + thm(x.tit=10, y.tit=10, x.txt=8, y.txt=8, tit=10, lgd.tit=8, lgd.txt=8, lgd.key=10)
+}
+```
+
+```{r, fig.width=1.35, fig.height=1.1}
+plot.roc1("Calu-3")
+plot.roc1("SC.Liao")
+```
+
+With experimentally validated drugs (union of those compiled by Kuleshov et al.):
+
+```{r}
+rbindlist(lapply(enr.res10.rxn, function(x) x$drugs.exp[reaction.set=="union"]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval), -"reaction.set"]
+rbindlist(lapply(enr.res20.rxn, function(x) x$drugs.exp[reaction.set=="union"]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval), -"reaction.set"]
+rbindlist(lapply(gsea.res, function(x) x$drugs.exp[pathway=="union"]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval), -"pathway"]
+```
+
+Any significantly enriched experimentally validated drug set:
+
+```{r}
+rbindlist(lapply(enr.res10.rxn, function(x) x$drugs.exp[padj<0.2]), idcol="dataset")
+rbindlist(lapply(enr.res20.rxn, function(x) x$drugs.exp[padj<0.2]), idcol="dataset")
+```
+
+Visualization:
+
+```{r, fig.width=4.4, fig.height=1.1}
+tmp <- rbindlist(lapply(enr.res10.rxn, function(x) x$drugs.exp[padj<0.1]), idcol="dataset")[order(padj,pval)]
+tmp[, ds:=paste0(dataset, ": ", reaction.set)]
+tmp[, ds:=factor(ds, levels=rev(ds))]
+p <- ggplot(tmp, aes(x=odds.ratio, y=ds)) +
+  xlab("Odds Ratio") +
+  geom_point(aes(color=padj, size=overlap.size)) + 
+  scale_color_continuous(low="red3", high="grey", name=expression(P[adj]), guide=guide_colorbar(reverse=TRUE)) + 
+  scale_size_continuous(name="overlap size", range=c(1,4)) +
+  geom_vline(xintercept=1, linetype="dashed", color="grey") +
+  annotate("text", x=2, y=7, label="odds ratio>1", size=2.8, color="grey30", angle=270) +
+  theme_classic() +
+  thm(x.tit=9, x.txt=8, y.tit=NULL, y.txt=8, lgd.tit=8, lgd.txt=6, lgd.key=10, plt.margin=c(1,0,0,0)) + theme(legend.spacing=unit(0,"pt"))
+p
+```
+
+Viral PPI genes:
+
+```{r, fig.width=2.6, fig.height=1}
+tmp <- rbindlist(lapply(enr.res10.rxn, function(x) x$ppi[reaction.set %in% c("ppi.gordon","ppi.stukalov")]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][padj<0.1][order(padj,pval)]
+tmp[, ds:=paste0(dataset, ": host-viral PPI from Stukalov et al.")]
+tmp[, ds:=factor(ds, levels=rev(ds))]
+p <- ggplot(tmp, aes(x=odds.ratio, y=ds)) +
+  xlab("Odds Ratio") + xlim(c(1.45,1.55)) +
+  geom_point(aes(color=pval, size=overlap.size)) + 
+  scale_size_continuous(name="overlap size", breaks=c(44,46), range=c(2,4)) +
+  scale_color_continuous(low="red3", high="grey", name="P value", guide=guide_colorbar(reverse=TRUE)) + 
+  theme_classic() +
+  thm(x.tit=9, x.txt=8, y.tit=NULL, y.txt=8, lgd.tit=8, lgd.txt=6, lgd.key=10, plt.margin=c(1,0,0,0)) + theme(legend.spacing=unit(0,"pt"))
+p
+```
+
+### Get final list of candidate targets
+
+Check some Venn diagrams:
+
+```{r, fig.width=2, fig.height=2}
+tmp <- lapply(top10.mta.hits[c("Swab.Butler","Swab.Lieberman","BALF","SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")], function(x) x$reaction)
+venn(tmp, zcolor="style", ilcs=1, sncs=1)
+tmp <- lapply(top10.mta.hits[c("NHBE","Vero","Calu-3","A549","293T","Caco-2")], function(x) x$reaction)
+venn(tmp, zcolor="style", ilcs=1, sncs=1)
+```
+
+Final list: the intersection of top 10% of at least 3 from {in vivo} and at least 3 from {in vitro}
+
+```{r}
+hits <- intersect(
+  rbindlist(top10.mta.hits[c("Swab.Butler","Swab.Lieberman","BALF","SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[, .(n=.N), by=reaction][n>=3, reaction],
+  rbindlist(top10.mta.hits[c("NHBE","Vero","Calu-3","A549","293T","Caco-2")])[, .(n=.N), by=reaction][n>=3, reaction]
+)
+
+length(hits) #hit rxns
+bg.rxns <- recon1$rxns[recon1$rules!=""] 
+sum(hits %in% bg.rxns) #hit rxns with mapped genes
+uniqueN(unlist(rxns2genes(recon1, hits))) #mapped genes
+sum(sapply(rxns2genes(recon1, hits), function(x) any(d2t$target %in% x))) #rxns with drugs
+d2t[target %in% unlist(rxns2genes(recon1, hits))][, uniqueN(target)] #genes with drugs
+d2t[target %in% unlist(rxns2genes(recon1, hits))][, uniqueN(drug)] #drugs
+```
+
+Balidation of final hits:
+
+```{r}
+enrich.gsets(hits, vrxns$screen, recon1$rxns)
+enrich.gsets(hits, vrxns$ppi, recon1$rxns)
+enrich.gsets(hits, vrxns$drugs.exp, recon1$rxns)
+lapply(screen.full, function(x) gsea(x, list(hits=unique(unlist(rxns2genes(recon1,hits))))))
+```
+
+Pathway enrichments of final hits:
+
+```{r}
+rset <- subsystems2gsets(recon1)
+enrich.gsets(hits, rset, recon1$rxns)[padj<0.1]
+tx.ce <- get.transport.info(recon1)
+enrich.gsets(hits, lapply(tx.ce, function(x) x$rxn), recon1$rxns)[padj<0.1]
+```
+
+```{r, fig.width=2.1, fig.height=1.2}
+tmp <- rbind(enrich.gsets(hits, rset, recon1$rxns)[padj<0.1], NA, enrich.gsets(hits, lapply(tx.ce, function(x) x$rxn), recon1$rxns)[padj<0.1 & !gene.set %in% c("na1","cl","nh4","hco3","k","h2o2","ca2")][, gene.set:=recon1$metNames[all2idx(recon1, paste0(gene.set,"[c]"))]], fill=TRUE)
+tmp[is.na(gene.set), gene.set:=""]
+tmp[, gene.set:=factor(gene.set, levels=gene.set)]
+tmp[, nlp:=-log10(padj)]
+
+p <- ggplot(tmp, aes(x=gene.set, y=odds.ratio)) +
+  ylab("Odds Ratio") + ylim(c(0,200)) +
+  geom_point(aes(color=nlp, size=overlap.size)) +
+  scale_size_continuous(name="overlap size", breaks=c(10,20,40), range=c(1,4)) +
+  scale_color_continuous(low="grey", high="red3", name=expression(-log[10]*P[adj])) + 
+  geom_hline(yintercept=1, linetype="dashed", color="grey") +
+  annotate("text", x=5, y=15, label="odds ratio>1", size=2.6, color="grey30") +
+  theme_classic() +
+  thm(x.tit=NULL, x.txt=list(size=9,angle=30,hjust=1), y.tit=10, y.txt=9, lgd="bottom", lgd.tit=8, lgd.txt=6, lgd.key=10, plt.margin=c(0,0,0,50), lgd.margin=c(-30,10,0,0)) + theme(legend.spacing=unit(0,"pt"))
+p
+```
+
+Export tables:
+
+```{r}
+hits <- intersect(
+  rbindlist(top10.mta.hits[c("Swab.Butler","Swab.Lieberman","BALF","SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[, .(n=.N), by=reaction][n>=3, reaction],
+  rbindlist(top10.mta.hits[c("NHBE","Vero","Calu-3","A549","293T","Caco-2")])[, .(n=.N), by=reaction][n>=3, reaction]
+)
+tps <- sapply(mta.res, function(x) x[match(hits,reaction), top.percent])
+use <- tps<20
+tps[!use] <- 20
+res <- data.table(reaction=hits, average.top.percent=rowMeans(tps), datasets=apply(use, 1, function(x) cc(names(x)[x])))
+res <- res[order(average.top.percent)]
+res[, pathway:=recon1$subSystems[all2idx(recon1, reaction)]]
+res[, genes:=rxns2genes(recon1, reaction)]
+res <- res[sapply(genes, length)!=0]
+res[, crispr.hits:=lapply(genes, function(x) x[x %in% vgenes$screen$pos.crispr.union])]
+res[, ppi.genes:=lapply(genes, function(x) x[x %in% vgenes$ppi$ppi.union])]
+res[, drugs:=lapply(genes, function(x) d2t[target %in% x, unique(drug)])]
+res[, drug.hits:=lapply(drugs, function(x) x[x %in% drugs.exp$union$drug])]
+res[, drugs:=lapply(genes, function(x) d2t[target %in% x, .(targets=list(target)), by=drug][, co(paste0(drug,":{",sapply(targets, co, c=","),"}"), c="|")])]
+res[drugs==":{}", drugs:=""]
+saveRDS(res, file="final.mta.hits.RDS")
+write.tab(res, "final.mta.hits.tsv", quote=FALSE)
+```
+
+```{r}
+tmp1 <- lapply(mta.res, function(x) x[, .(reaction, score=norm.score, top.percent, genes, pathway)])
+tmp2 <- rbindlist(lapply(enr.res10.rxn, function(x) x$screen[reaction.set=="pos.crispr.union"]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval), -"reaction.set"]
+tmp3 <- rbindlist(lapply(enr.res10.rxn, function(x) x$drugs.exp[padj<0.1]), idcol="dataset")[order(padj,pval)]
+tmp4 <- rbindlist(lapply(enr.res10.rxn, function(x) x$ppi[reaction.set %in% c("ppi.gordon","ppi.stukalov")]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval)]
+tmp <- c(tmp1, list(S6B=tmp2, S6C=tmp3, S6D=tmp4))
+rio::export(tmp, "../gem_manuscript/Table S6_MTA-predicted anti-SARS-CoV-2 metabolic targets based on each dataset and their validations.xlsx")
+
+
+tmp <- rbind(enrich.gsets(hits, rset, recon1$rxns, name="reaction"), NA, enrich.gsets(hits, lapply(tx.ce, function(x) x$rxn), recon1$rxns, name="reaction")[, reaction.set:=recon1$metNames[all2idx(recon1, paste0(reaction.set,"[c]"))]], fill=TRUE)
+tmp[, x:=NULL]
+tmp <- list(S7A=res, S7B=tmp)
+rio::export(tmp, "../gem_manuscript/Table S7_Consensus MTA-predicted anti-SARS-CoV-2 metabolic targets across datasets and their pathway enrichment.xlsx")
+```
+
+
+
+

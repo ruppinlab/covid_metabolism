@@ -1,0 +1,334 @@
+---
+title: "Check differential flux analysis results"
+output: html_notebook
+---
+
+```{r}
+library(my.utils)
+library(gembox)
+library(ComplexHeatmap)
+library(rio)
+```
+
+```{r}
+load("../GEM/dflux.res.RData")
+```
+
+### compare DF genes across different datasets
+
+```{r}
+sapply(df.res, function(x) c(nrow(x), x[dir!=0, .N]))
+```
+
+PCA plot:
+
+```{r, fig.width=1.5, fig.height=1.4}
+rxns <- Reduce(intersect, lapply(df.res, function(x) x[!is.na(lfc.abs), rxn]))
+lfc.mat <- t(sapply(df.res, function(x) x[match(rxns, rxn), inv.norm(lfc.abs)]))
+plot.pca(lfc.mat, label=ds)
+```
+
+### enrichment among top DF pathways from different datasets
+
+Pair-wise overlap (enrichment by fisher's test) of the top differential flux reactions in either direction:
+
+```{r}
+tmpf <- function(a,b, dat=df.res, d=c(1,-1)) mapply(function(i,j) enrich.test(dat[[i]][dir %in% d, rxn], dat[[j]][dir %in% d, rxn], recon1$rxns, alternative="greater")$estimate, a, b)
+tmpf1 <- function(a,b, dat=df.res, d=c(1,-1)) mapply(function(i,j) enrich.test(dat[[i]][dir %in% d, rxn], dat[[j]][dir %in% d, rxn], recon1$rxns, alternative="greater")$p.value, a, b)
+ds <- names(df.res)
+names(ds) <- ds
+or.mat <- outer(ds, ds, tmpf, d=1)
+p.mat <- outer(ds, ds, tmpf1, d=1)
+p.mat[upper.tri(p.mat)] <- p.adjust(p.mat[upper.tri(p.mat)], "BH")
+p.mat[lower.tri(p.mat)] <- p.adjust(p.mat[lower.tri(p.mat)], "BH")
+
+or.mat1 <- outer(ds, ds, tmpf, d=-1)
+p.mat1 <- outer(ds, ds, tmpf1, d=-1)
+p.mat1[upper.tri(p.mat1)] <- p.adjust(p.mat1[upper.tri(p.mat1)], "BH")
+p.mat1[lower.tri(p.mat1)] <- p.adjust(p.mat1[lower.tri(p.mat1)], "BH")
+```
+
+```{r}
+plot.mat <- function(mat, pmat) {
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  mat <- mat[cl$order, ][, cl$order]
+  pmat <- pmat[cl$order, ][, cl$order]
+  tmp <- mat
+  tmp[tmp==0] <- min(tmp[tmp!=0])
+  cl <- hclust(as.dist(1/tmp))
+  diag(mat) <- NA
+  diag(pmat) <- 0
+  pmat <- -log10(pmat)
+  colf <- circlize::colorRamp2(c(0, -log10(0.05), quantile(pmat[is.finite(pmat)], 0.75)), c("grey70", "blue", "red"))
+  rf <- function(i=NULL,j=NULL,x=NULL) {
+    rmax <- 0.5
+    rmin <- 0.2
+    xmax <- max(mat[is.finite(mat)])
+    if (is.null(x)) x <- mat[i,j]
+    if (is.na(x)) res <- NA else if (x>=1) res <- rmin + (rmax-rmin)*(x-1)/(xmax-1) else res <- 0.05 + (0.2-0.05)*x
+    if (is.na(res)) NA else res*unit(3,"mm")
+  }
+  cellf <- function(j, i, x, y, width, height, fill) {
+    grid.rect(x=x, y=y, width=width, height=height, gp=gpar(col=NA, fill=NA))
+    #grid.circle(x=x, y=y, r=mat[i,j]/max(mat,na.rm=TRUE)/2*min(unit.c(width,height)), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+    if (is.infinite(mat[i,j])) grid.circle(x=x, y=y, r=rf(x=max(mat[is.finite(mat)])), gp=gpar(fill=colf(pmat[i,j]), col="black"))
+    else grid.circle(x=x, y=y, r=rf(i,j), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+  }
+  hm <- Heatmap(pmat,
+    #name="-log10(padj)",
+    width=ncol(pmat)*unit(4,"mm"),
+    height=nrow(pmat)*unit(4,"mm"),
+    row_title=NULL,
+    #row_title_gp=gpar(fontsize=9),
+    row_names_gp=gpar(fontsize=8),
+    row_names_side="left",
+    cluster_rows=cl,
+    row_dend_side="right",
+    row_dend_width=unit(6,"mm"),
+    column_title=NULL,
+    #column_title_gp=gpar(fontsize=9),
+    column_title_side="bottom",
+    column_names_gp=gpar(fontsize=8),
+    column_names_rot=40,
+    cluster_columns=cl,
+    column_dend_height=unit(6,"mm"),
+    col=colf,
+    rect_gp=gpar(type="none"),
+    cell_fun=cellf,
+    show_heatmap_legend=FALSE
+    #heatmap_legend_param=list(title_gp=gpar(fontsize=6),
+    #                          labels_gp=gpar(fontsize=6),
+    #                          grid_width=unit(3,"mm"))
+  )
+  lgd1 <- Legend(col_fun=colf, title=expression(-log[10]*P[adj]), title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"))
+  lgd2 <- Legend(title="Odds Ratio", labels=c(30,15,1),
+    title_gp=gpar(fontsize=8, fontface="plain"), labels_gp=gpar(fontsize=7, fontface="plain"),
+    graphics=list(#function(x, y, w, h) grid.circle(x, y, r=rf(x=30), gp=gpar(fill="grey", col="black")),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=30), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=15), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=1), gp=gpar(fill="grey", col=NA)))
+  )
+  lgd <- packLegend(lgd1, lgd2)
+  draw(hm, annotation_legend_list=lgd)
+}
+```
+
+```{r, fig.width=2.35, fig.height=1.6, warning=FALSE}
+plot.mat(or.mat, p.mat)
+plot.mat(or.mat1, p.mat1)
+```
+
+
+### pathway enrichment of consistently changed reactions
+
+Below, print the number of consistently changed reactions in either direction, then show the pathway enrichment of either set of reactions, as well as both sets of reactions combined:
+
+```{r}
+rxns.pos <- unique(setdiff(
+  intersect(
+    rbindlist(df.res[c("SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[dir==1, rxn],
+    rbindlist(df.res[c("Swab.Butler","Swab.Lieberman","BALF")])[dir==1, rxn]
+  ),
+  rbindlist(df.res)[dir==-1, .(n=.N), by=rxn][n>=4, rxn]
+))
+
+rxns.neg <- unique(setdiff(
+  intersect(
+    rbindlist(df.res[c("SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[dir==-1, rxn],
+    rbindlist(df.res[c("Swab.Butler","Swab.Lieberman","BALF")])[dir==-1, rxn]
+  ),
+  rbindlist(df.res)[dir==1, .(n=.N), by=rxn][n>=4, rxn]
+))
+
+tmp <- intersect(rxns.pos, rxns.neg)
+rxns.pos <- setdiff(rxns.pos, tmp)
+rxns.neg <- setdiff(rxns.neg, tmp)
+length(rxns.pos)
+length(rxns.neg)
+
+rset <- subsystems2gsets(recon1)
+( enr.res.pos <- enrich.gsets(rxns.pos, rset, recon1$rxns)[padj<0.1] )
+( enr.res.neg <- enrich.gsets(rxns.neg, rset, recon1$rxns)[padj<0.1] )
+( enr.res.both <- enrich.gsets(union(rxns.pos, rxns.neg), rset, recon1$rxns)[padj<0.1] )
+```
+
+```{r, fig.width=2.5, fig.height=1.5}
+tmp <- rbind(enr.res.pos, enr.res.neg)[!duplicated(gene.set)][order(padj,pval)]
+tmp[, gene.set:=factor(gene.set, levels=gene.set)]
+plot.dot1 <- function (dat, x = "odds.ratio", y = "gene.set", color = "padj", 
+    size = "overlap.size", ylab = NULL) 
+{
+    size1 <- size
+    #dat <- dat[order(get(x))]
+    #dat[, `:=`(c(y), factor(get(y), levels = get(y)))]
+    if (is.null(xlab)) 
+        xlab <- x
+    p <- ggplot(dat, aes(x = get(x), y = get(y))) + ylab(ylab) + 
+        theme_classic() + theme(axis.title.y = element_text(size = 10), axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(size = 8, angle=35, hjust=1), axis.title.x = element_blank())
+    if (!is.null(color) && is.null(size1)) 
+        p <- p + geom_point(aes(color = get(color))) + scale_color_continuous(low = "red3", 
+            high = "grey", name = color, guide = guide_colorbar(reverse = TRUE))
+    if (!is.null(size1) && is.null(color)) 
+        p <- p + geom_point(aes(size = get(size1))) + scale_size_continuous(name = size1)
+    if (!is.null(color) && !is.null(size1)) 
+        p <- p + geom_point(aes(color = get(color), size = get(size1))) + 
+            scale_color_continuous(low = "red3", high = "grey", 
+                name = color, guide = guide_colorbar(reverse = TRUE)) + 
+            scale_size_continuous(name = size1)
+    return(p)
+}
+plot.dot1(tmp, x="gene.set", y="odds.ratio", ylab="Odds Ratio") +
+  theme(plot.margin=unit(c(4,1,1,15),"mm"),
+    legend.title=element_text(size=8),
+    legend.text=element_text(size=6),
+    legend.key.size=unit(3,"mm"),
+  )
+```
+
+Examine the consistent transport reactions by metabolite (the metabolites show consistent transport in the two directions are printed below separately):
+
+```{r}
+tx.pos <- unique(setdiff(
+  intersect(
+    rbindlist(df.tx.res[c("SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[dir==1, id],
+    rbindlist(df.tx.res[c("Swab.Butler","Swab.Lieberman","BALF")])[dir==1, id]
+  ),
+  rbindlist(df.tx.res)[dir==-1, .(n=.N), by=id][n>=4, id]
+))
+
+tx.neg <- unique(setdiff(
+  intersect(
+    rbindlist(df.tx.res[c("SC.Liao","SC.Chua.Basal","SC.Chua.Ciliated")])[dir==-1, id],
+    rbindlist(df.tx.res[c("Swab.Butler","Swab.Lieberman","BALF")])[dir==-1, id]
+  ),
+  rbindlist(df.tx.res)[dir==1, .(n=.N), by=id][n>=4, id]
+))
+
+tmp <- intersect(tx.pos, tx.neg)
+tx.pos <- setdiff(tx.pos, tmp)
+tx.neg <- setdiff(tx.neg, tmp)
+tx.pos
+tx.neg
+```
+
+Plot these consistent transport results:
+
+```{r, fig.width=4.5, fig.height=2.2}
+tx.pos <- tx.pos[!tx.pos %in% c("so4","hco3")]
+tx.neg <- tx.neg[!tx.neg %in% c("h2o","no")]
+
+tmpf <- function(x,i=-1) {
+  nm <- recon1$metNames[all2idx(recon1, paste0(x,"[c]"))]
+  rmat <- t(sapply(df.tx.res, function(xx) xx[match(x, id), r]))
+  dmat <- t(sapply(df.tx.res, function(xx) xx[match(x, id), rel.diff]))
+  colnames(rmat) <- nm
+  colnames(dmat) <- nm
+  id <- order(i*colSums(rmat))
+  list(rmat=rmat[,id], dmat=dmat[,id])
+}
+
+tmp1 <- tmpf(tx.pos)
+tmp2 <- tmpf(tx.neg, 1)
+rmat <- cbind(tmp1$rmat, NA, tmp2$rmat)
+dmat <- cbind(tmp1$dmat, NA, tmp2$dmat)
+
+colf <- circlize::colorRamp2(c(-1, 0, 1), c("blue","white","red"))
+rf <- function(i=NULL,j=NULL,x=NULL) {
+  rmax <- 0.5
+  rmin <- 0.2
+  #xmax <- max(abs(dmat), na.rm=TRUE)
+  xmax <- 1
+  #xmin <- min(abs(mat), na.rm=TRUE)
+  xmin <- 0.01
+  if (is.null(x)) x <- abs(dmat[i,j])
+  if (x<xmin) x <- xmin
+  if (x>xmax) x <- xmax
+  res <- rmin + (rmax-rmin)*(x-xmin)/(xmax-xmin)
+  res*unit(3,"mm")
+}
+  
+cellf <- function(j, i, x, y, width, height, fill) {
+  grid.rect(x=x, y=y, width=width, height=height, gp=gpar(col=NA, fill=NA))
+  #grid.circle(x=x, y=y, r=mat[i,j]/max(mat,na.rm=TRUE)/2*min(unit.c(width,height)), gp=gpar(fill=colf(pmat[i,j]), col=NA))
+  if (!is.na(rmat[i,j]) && !is.na(dmat[i,j])) grid.circle(x=x, y=y, r=rf(i,j), gp=gpar(fill=colf(rmat[i,j]), col=NA))
+}
+
+hm <- Heatmap(rmat,
+        width=ncol(rmat)*unit(5.5,"mm"),
+        height=nrow(rmat)*unit(5.5,"mm"),
+        row_title="Dataset",
+        row_title_gp=gpar(fontsize=10),
+        row_names_gp=gpar(fontsize=9),
+        row_names_side="left",
+        row_dend_side="left",
+        row_dend_width=unit(6,"mm"),
+        column_title="Metabolite",
+        column_title_side="bottom",
+        column_title_gp=gpar(fontsize=10),
+        column_names_gp=gpar(fontsize=9),
+        column_names_rot=40,
+        cluster_columns=FALSE,
+        show_column_dend=FALSE,
+        rect_gp=gpar(type="none"),
+        cell_fun=cellf,
+        #col=colf,
+        heatmap_legend_param=list(#legend_direction="horizontal", # bug here with dev version; works with Bioc version
+                                  #grid_height=unit(2,"mm"),
+                                  grid_width=unit(3,"mm"),
+                                  title=expression(r[rb]),
+                                  title_gp=gpar(fontsize=9, fontface="plain"),
+                                  labels_gp=gpar(fontsize=8))
+)
+
+lgd1 <- Legend(title="abs(%dflux)", labels=c(">=100", 50, 5),
+    title_gp=gpar(fontsize=9, fontface="plain"), labels_gp=gpar(fontsize=8, fontface="plain"),
+    graphics=list(function(x, y, w, h) grid.circle(x, y, r=rf(x=1), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=0.5), gp=gpar(fill="grey", col=NA)),
+                  function(x, y, w, h) grid.circle(x, y, r=rf(x=0.05), gp=gpar(fill="grey", col=NA)))
+)
+
+draw(hm, annotation_legend_list=lgd1, merge_legend=TRUE)
+```
+
+Export tables:
+
+```{r}
+rio::export(df.res, "../gem_manuscript/Table S4_SARS-CoV-2-infected compared to control differential flux results for each dataset.xlsx")
+
+tmpf <- function(gs, dir=1) {
+  dm <- lapply(df.res, function(x) x[match(gs, rxn), rel.diff])
+  names(dm) <- paste0(names(dm), "_rel.diff")
+  r <- lapply(df.res, function(x) x[match(gs, rxn), r])
+  names(r) <- paste0(names(r), "_r")
+  res <- as.data.table(c(dm, r)[c(matrix(1:(length(dm)*2), nrow=2, byrow=TRUE))])
+  cbind(reaction=gs, direction=dir, res)
+}
+tmp0 <- rbind(tmpf(rxns.pos), tmpf(rxns.neg, -1))
+
+tmp1 <- rbind(enr.res.pos, enr.res.neg)[!duplicated(gene.set)][order(padj,pval)]
+
+tmpf <- function(gs, dir=1) {
+  dm <- lapply(df.tx.res, function(x) x[match(gs, id), rel.diff])
+  names(dm) <- paste0(names(dm), "_rel.diff")
+  r <- lapply(df.tx.res, function(x) x[match(gs, id), r])
+  names(r) <- paste0(names(r), "_r")
+  res <- as.data.table(c(dm, r)[c(matrix(1:(length(dm)*2), nrow=2, byrow=TRUE))])
+  cbind(metabolite=recon1$metNames[all2idx(recon1,paste0(gs,"[c]"))], direction=dir, res)
+}
+tmp2 <- rbind(tmpf(tx.pos), tmpf(tx.neg, -1))
+
+tmp <- setdiff(unq(rxns2mets(recon1, which(recon1$subSystems %in% c("Inositol Phosphate Metabolism","Fatty acid elongation")))), get.exclude.mets(recon1))
+tmp3 <- data.table(metabolite.id=recon1$mets[tmp], metabolite.name=recon1$metNames[tmp])
+
+tmp <- list(S5A=tmp0, S5B=tmp1, S5C=tmp2, S5D=tmp3)
+rio::export(tmp, "../gem_manuscript/Table S5_SARS-CoV-2-infected compared to control most consistently altered metabolic fluxes across datasets.xlsx")
+```
+
+
+
+
+
+

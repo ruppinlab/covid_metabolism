@@ -1,0 +1,114 @@
+---
+title: "Interactive network visualization of consistent pathway-level differential flux patterns across datasets"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE)
+```
+
+```{r}
+library(my.utils)
+library(gembox)
+library(visNetwork)
+```
+
+```{r}
+load("../GEM/dflux.res.RData")
+```
+
+```{r}
+plot1 <- function(paths, add=NULL, rm=NULL, keep=NULL, grey=NULL, n=2, lo=0, ...) {
+  ids <- recon1$rxns[which(recon1$subSystems %in% paths)]
+  if (!is.null(keep)) ids <- intersect(ids, keep)
+  ids <- unique(setdiff(c(ids, add), rm))
+  v <- sign(rowMeans(sapply(df.res, function(x) x[match(ids, rxn), sign(mean1)])))
+  dv <- rowSums(sapply(df.res, function(x) x[match(ids, rxn), dir]))
+  dv <- ifelse(abs(dv)>=n, sign(dv), 0)
+  dv[ids %in% grey] <- 0
+  if (lo==0) plot.model(recon1, rxns=ids, fluxes=v, dfluxes=dv, ...)
+    else if (lo==1) plot.model(recon1, rxns=ids, fluxes=v, dfluxes=dv, layout="layout_nicely", ...)
+    else if (lo==2) plot.model(recon1, rxns=ids, fluxes=v, dfluxes=dv, layout="layout_with_fr", ...)
+    else plot.model(recon1, rxns=ids, fluxes=v, dfluxes=dv, layout=lo, ...)
+}
+```
+
+Pyrimidine Biosynthesis:
+
+```{r}
+plot1("Pyrimidine Biosynthesis", rxn.lab="none", met.lab="name")
+```
+
+Citric Acid Cycle:
+
+```{r}
+plot1("Citric Acid Cycle", keep=c("CSm","ACONTm","ICDHyrm","ICDHxm","AKGDm","SUCOASm","SUCOAS1m","SUCD1m","FUMm","MDHm"), met.lab="name", rxn.lab="none", grey=c("SUCOASm","SUCOAS1m"), seed=6)
+```
+
+Cytosolic counterparts of Citric Acid Cycle metabolites:
+
+```{r}
+plot1("Citric Acid Cycle", keep=c("FUM","MDH","ACITL","ACONT","ICDHy"), rm="ACITL", add=c("ASPTA","FUMtm","CITtam","AKGMALtm"), met.lab="name", rxn.lab="none")
+```
+
+Glycine, Serine, and Threonine Metabolism:
+
+```{r}
+plot1("Glycine, Serine, and Threonine Metabolism", n=3, keep=c("GNMT","GHMT2r","SERHL","2AMACHYD","ALR","AACTOOR","PGCD","PSERT","PSP_L","GLYATm","AOBUTDsm","BHMT","CHOLD2m","BETALDHxm","DMGDHm"), add=c("GLYBtm","GLYtm","DMGtm"), rm=c("AACTOOR","ALR","AOBUTDsm","DMGDHm","DMGtm","BHMT","GLYBtm","BETALDHxm","CHOLD2m"), rxn.lab="none", met.lab="name", seed=4)
+```
+
+Inositol Phosphate Metabolism:
+
+```{r}
+plot1("Inositol Phosphate Metabolism", rm=c("PMI12346PHn","PI5P3Ker","MI3456PK","PMI1346PH","MI13456PK","PMI12346PH","PI4P3Ker","PIK3er",grep("n$",recon1$rxns,value=TRUE),"MI134PK", "PI345P5P","PI45P3K","PI45P4P","PI3PP","PI5P3K"), n=3, rxn.lab="none", met.lab="id", met.lab.size=40, exclude.mets="dag_hs[c]", seed=3) #grey=c("PI345P3P","PI45P3K","PI345P5P","PI34P5K","PI5P3K","PI35P3P","PIK3","PI3PP")
+```
+
+Fatty acid elongation:
+
+```{r}
+plot1("Fatty acid elongation", rm=c("DESAT22_1p","DESAT24_1","DESAT22_2p"), n=1, rxn.lab="none", met.lab="id", met.lab.size=40, seed=3)
+```
+
+Many others:
+
+```{r}
+plot1("Pentose and Glucuronate Interconversions")
+```
+
+```{r}
+plot1("Glyoxylate and Dicarboxylate Metabolism")
+```
+
+```{r}
+plot1("Aminosugar Metabolism ")
+```
+
+```{r}
+plot1("Glycerophospholipid Metabolism")
+```
+
+```{r}
+plot1("Urea cycle/amino group metabolism", add=c("ORNt3m","ORNt4m","CITRtm","ARGSS","ARGSL"), rm=c("SARDHm","AGPRim"))
+```
+
+```{r}
+plot1("Folate Metabolism")
+```
+
+```{r}
+plot1("Oxidative Phosphorylation", n=1)
+```
+
+```{r}
+plot1("Pentose Phosphate Pathway")
+```
+
+```{r}
+plot1("Pyruvate Metabolism")
+```
+
+```{r}
+plot1("Vitamin A Metabolism")
+```
+
+
