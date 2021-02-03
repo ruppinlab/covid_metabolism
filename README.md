@@ -55,12 +55,13 @@ Scripts for GEM analysis on the Vero E6 cell remdesivir treatment data
 * imat.R: run iMAT for each experimental group
 * mta.R: run MTA for pairs of experimental groups
 * dflux.R: differential flux analysis between pairs of experimental groups
-* collect.results.R: collect the differential flux analysis and MTA results
+* collect.results.R: collect the differential flux analysis results
 
 ### analyze_results
 
 Scripts and R notebooks for inspecting the results from various analyses and for validating the MTA predictions:
 
-* functions.R: various functions, will be sourced in check.mta.results.R
+* functions.R: various functions, will be sourced in check.mta.results.R and check.mta.results.remdesivir.R
 * check.mta.results.R: various validations and pathway enrichment analysis of MTA results
-
+* check.mta.results.remdesivir.R: various validations and pathway enrichment analysis of MTA results for predicting combinatory target with remdesivir
+* Various .Rmd files: R notebook for inspecting and visualizing results from different analyses, see their contents for details
