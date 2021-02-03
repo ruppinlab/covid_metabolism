@@ -18,7 +18,9 @@ Cheng et al. Genome-scale metabolic modeling reveals SARS-CoV-2-induced host met
 
 ### Data
 
-Download the data files from [here](url) then decompress them into the **data** folder; or it may be possible to use the dnload.sh script in the **data** folder.
+The required data can be downloaded by running the `dnload.sh` bash script in the `data` folder. To use `dnload.sh`, `gdown` need to be installed e.g. with `pip install gdown`. Data files containing results from the various analyses are also included in the download.
+
+Alternatively, one can manually download the data files from [here](https://drive.google.com/file/d/1t8FUZWP9mgl8LUZCNHNJYEAIiQ_TQDdh/view?usp=sharing) then decompress them into the `data` folder. The two single-cell RNA-sequencing datasets from Liao et al. and Chua et al. are quite large and not included in this download. Check `dnload.sh` for details on how these two datasets should be downloaded.
 
 ## 2. Description of folders and files
 
@@ -28,40 +30,40 @@ The scripts should be run in the same order as they are introduced below.
 
 All required data should be saved in this folder.
 
-* dnload.sh: a bash script for downloading the required data
-* collect.validation.data.R: prepare the data for validating the MTA prediction
+* `dnload.sh`: a bash script for downloading the required data
+* `collect.validation.data.R`: prepare the data for validating the MTA prediction
 
 ### expression
 
 Scripts for gene expression-level analysis: 
 
-* de.and.gsea.R: differential expression (DE) and gene set enrichment analysis (GSEA) between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
-* de.and.gsea.remdesivir.R: DE and GSEA analysis for the Vero E6 cell remdesivir treatment data
+* `de.and.gsea.R`: differential expression (DE) and gene set enrichment analysis (GSEA) between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
+* `de.and.gsea.remdesivir.R`: DE and GSEA analysis for the Vero E6 cell remdesivir treatment data
 
 ### GEM
 
 Scripts for genome-scale metabolic modeling (GEM) analysis:
 
-* prepare.data.R: prepare data for GEM
-* imat.and.mta.R: run iMAT and MTA on each dataset
-* dflux.R: differential flux analysis between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
-* collect.results.R: collect the differential flux analysis and MTA results across datasets
+* `prepare.data.R`: prepare data for GEM
+* `imat.and.mta.R`: run iMAT and MTA on each dataset
+* `dflux.R`: differential flux analysis between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
+* `collect.results.R`: collect the differential flux analysis and MTA results across datasets
 
 ### GEM_remdesivir
 
 Scripts for GEM analysis on the Vero E6 cell remdesivir treatment data
 
-* prepare.data.R: prepare data for GEM
-* imat.R: run iMAT for each experimental group
-* mta.R: run MTA for pairs of experimental groups
-* dflux.R: differential flux analysis between pairs of experimental groups
-* collect.results.R: collect the differential flux analysis results
+* `prepare.data.R`: prepare data for GEM
+* `imat.R`: run iMAT for each experimental group
+* `mta.R`: run MTA for pairs of experimental groups
+* `dflux.R`: differential flux analysis between pairs of experimental groups
+* `collect.results.R`: collect the differential flux analysis results
 
 ### analyze_results
 
 Scripts and R notebooks for inspecting the results from various analyses and for validating the MTA predictions:
 
-* functions.R: various functions, will be sourced in check.mta.results.R and check.mta.results.remdesivir.R
-* check.mta.results.R: various validations and pathway enrichment analysis of MTA results
-* check.mta.results.remdesivir.R: various validations and pathway enrichment analysis of MTA results for predicting combinatory target with remdesivir
-* Various .Rmd files: R notebook for inspecting and visualizing results from different analyses, see their contents for details
+* `functions.R`: various functions, will be sourced in check.mta.results.R and check.mta.results.remdesivir.R
+* `check.mta.results.R`: various validations and pathway enrichment analysis of MTA results
+* `check.mta.results.remdesivir.R`: various validations and pathway enrichment analysis of MTA results for predicting combinatory target with remdesivir
+* Various `.Rmd` files: R notebook for inspecting and visualizing results from different analyses, see their contents for details
