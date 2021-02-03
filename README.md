@@ -18,9 +18,9 @@ Cheng et al. Genome-scale metabolic modeling reveals SARS-CoV-2-induced host met
 
 ### Data
 
-The required data can be downloaded by running the `dnload.sh` bash script in the `data` folder. To use `dnload.sh`, `gdown` need to be installed e.g. with `pip install gdown`. Data files containing results from the various analyses are also included in the download.
+The required data can be downloaded by running the `dnload.sh` bash script in the `data` folder. `dnload.sh` uses `wget` and `gdown` (the latter used for downloading files from Google Drive and can be installed with `pip install gdown`). Data files containing results from the various analyses are also included in the download.
 
-Alternatively, one can manually download the data files from [here](https://drive.google.com/file/d/1bVPCQlDR3G8TTMx09jkN3IuGwzq9n9hi/view?usp=sharing) then decompress them into the `data` folder. The two single-cell RNA-sequencing datasets from Liao et al. and Chua et al. are quite large and not included in this download. Check `dnload.sh` for details on how these two datasets should be downloaded.
+Alternatively, one can manually download the data files from [this Google Drive link](https://drive.google.com/file/d/1bVPCQlDR3G8TTMx09jkN3IuGwzq9n9hi/view?usp=sharing) then decompress them into the `data` folder. The two single-cell RNA-sequencing datasets from Liao et al. and Chua et al. are quite large and not included in this download. Check `dnload.sh` for details on how these two datasets should be downloaded.
 
 ## 2. Description of folders and files
 
