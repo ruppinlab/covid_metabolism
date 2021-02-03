@@ -313,13 +313,13 @@ tmp2 <- rbindlist(lapply(enr.res10.rxn, function(x) x$screen[reaction.set=="pos.
 tmp3 <- rbindlist(lapply(enr.res10.rxn, function(x) x$drugs.exp[padj<0.1]), idcol="dataset")[order(padj,pval)]
 tmp4 <- rbindlist(lapply(enr.res10.rxn, function(x) x$ppi[reaction.set %in% c("ppi.gordon","ppi.stukalov")]), idcol="dataset")[, padj:=p.adjust(pval,"BH")][order(padj,pval)]
 tmp <- c(tmp1, list(S6B=tmp2, S6C=tmp3, S6D=tmp4))
-rio::export(tmp, "../gem_manuscript/Table S6_MTA-predicted anti-SARS-CoV-2 metabolic targets based on each dataset and their validations.xlsx")
+rio::export(tmp, "Table S6_MTA-predicted anti-SARS-CoV-2 metabolic targets based on each dataset and their validations.xlsx")
 
 
 tmp <- rbind(enrich.gsets(hits, rset, recon1$rxns, name="reaction"), NA, enrich.gsets(hits, lapply(tx.ce, function(x) x$rxn), recon1$rxns, name="reaction")[, reaction.set:=recon1$metNames[all2idx(recon1, paste0(reaction.set,"[c]"))]], fill=TRUE)
 tmp[, x:=NULL]
 tmp <- list(S7A=res, S7B=tmp)
-rio::export(tmp, "../gem_manuscript/Table S7_Consensus MTA-predicted anti-SARS-CoV-2 metabolic targets across datasets and their pathway enrichment.xlsx")
+rio::export(tmp, "Table S7_Consensus MTA-predicted anti-SARS-CoV-2 metabolic targets across datasets and their pathway enrichment.xlsx")
 ```
 
 

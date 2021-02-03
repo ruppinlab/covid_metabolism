@@ -1,0 +1,89 @@
+---
+title: "Check MTA prediction results based on Vero E6 cell remdesivir treatment data"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r}
+library(my.utils)
+library(gembox)
+library(rio)
+```
+
+```{r}
+mta.res <- readRDS("../GEM_remdesivir/mta.res.RDS")
+load("check.mta.res.remdesivir.RData")
+```
+
+one key validation: enrichment for "20 FDA-approved drugs synergistic with remdesivir in Calu-3 cells from Nguyenla et al."
+
+```{r}
+enr.res10.rxn$drugs.exp[grep("remdesivir",reaction.set)][order(padj,pval)]
+enr.res20.rxn$drugs.exp[grep("remdesivir",reaction.set)][order(padj,pval)]
+```
+
+btw, any enrichment for single targets? -- no
+```{r}
+enr.res10.rxn$screen[reaction.set=="pos.crispr.union"][order(padj,pval), -"reaction.set"]
+enr.res20.rxn$screen[reaction.set=="pos.crispr.union"][order(padj,pval), -"reaction.set"]
+```
+
+any significant enrichment for experimental drug set:
+```{r}
+enr.res10.rxn$drugs.exp[padj<0.2]
+enr.res20.rxn$drugs.exp[padj<0.2]
+```
+
+enrichment for host-viral PPI? -- no
+```{r}
+rbindlist(enr.res10.rxn$ppi, idcol="dataset")[order(padj,pval)]
+rbindlist(enr.res20.rxn$ppi, idcol="dataset")[order(padj,pval)]
+```
+
+pathway enrichment of top hits
+```{r}
+path.enr.res10[padj<0.1]
+path.enr.res20[padj<0.1]
+```
+
+```{r, fig.width=3.2, fig.height=1.4}
+tmp <- path.enr.res20[padj<0.1]
+tmp[, nlp:=-log10(padj)]
+tmp[, reaction.set:=factor(reaction.set, levels=reaction.set)]
+
+p <- ggplot(tmp) +
+  ylab("Odds Ratio") +
+  geom_point(aes(x=reaction.set, y=odds.ratio, color=nlp, size=overlap.size)) + 
+  scale_color_continuous(low="grey", high="red3", name=expression(-log[10]*P[adj])) + 
+  scale_size_continuous(name="overlap size", range=c(1,4)) +
+  geom_hline(yintercept=1, linetype="dashed", color="grey") +
+  annotate("text", x=1.5, y=2.5, label="odds ratio>1", size=2.5, color="grey30") +
+  theme_classic() +
+  thm(y.tit=10, y.txt=8, x.tit=NULL, x.txt=list(size=8,angle=30,hjust=1,face=ifelse(tmp$reaction.set %in% path.enr.res10$`40_vd2c_0.05`[padj<0.1, reaction.set],"bold","plain")), lgd.tit=8, lgd.txt=6, lgd.key=10, lgd.margin=c(20,0,0,0), plt.margin=c(0,0,0,35)) + theme(legend.spacing=unit(0,"pt"))
+p
+```
+
+Export tables:
+```{r}
+load("../data/data.for.validation.RData")
+res <- copy(top20.mta.hits)[, .(reaction, score=norm.score, top.percent, genes, pathway)]
+res <- res[sapply(genes, length)!=0]
+res[, crispr.hits:=lapply(genes, function(x) x[x %in% vgenes$screen$pos.crispr.union])]
+res[, ppi.genes:=lapply(genes, function(x) x[x %in% vgenes$ppi$ppi.union])]
+res[, drugs:=lapply(genes, function(x) d2t[target %in% x, unique(drug)])]
+res[, drug.hits:=lapply(drugs, function(x) x[x %in% drugs.exp$union$drug])]
+res[, drugs:=lapply(genes, function(x) d2t[target %in% x, .(targets=list(target)), by=drug][, co(paste0(drug,":{",sapply(targets, co, c=","),"}"), c="|")])]
+res[drugs==":{}", drugs:=""]
+saveRDS(res, file="final.mta.hits.remdesivier.RDS")
+write.tab(res, "final.mta.hits.remdesivir.tsv", quote=FALSE)
+```
+
+```{r}
+tmp <- list(S10A=res, S10B=rbind(path.enr.res10[padj<0.1], NA, path.enr.res20[padj<0.1], fill=TRUE))
+rio::export(tmp, "Table S10_MTA-predicted anti-SARS-CoV-2 metabolic targets in combination with remdesivir and their pathway enrichment.xlsx")
+```
+
+

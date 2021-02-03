@@ -437,12 +437,12 @@ Export tables:
 
 ```{r}
 tmp <- lapply(de.res, function(x) x[id!="", .(gene=id, log.fold.change=log.fc, p.value=pval, adjusted.p.value=padj)])
-rio::export(tmp, "../gem_manuscript/Table S1_SARS-CoV-2-infected compared to control differential expression results for each dataset.xlsx")
+rio::export(tmp, "Table S1_SARS-CoV-2-infected compared to control differential expression results for each dataset.xlsx")
 
 tmp <- gsea.res.metab.kegg
 names(tmp) <- paste0(names(tmp), "_KEGG_Metabolism")
 tmp <- c(gsea.res, tmp)
-rio::export(tmp, "../gem_manuscript/Table S2_SARS-CoV-2-infected compared to control GSEA results for each dataset.xlsx")
+rio::export(tmp, "Table S2_SARS-CoV-2-infected compared to control GSEA results for each dataset.xlsx")
 
 tmpf <- function(gs) {
   nes <- lapply(gsea.res, function(x) x[match(gs, pathway), NES])
@@ -453,7 +453,7 @@ tmpf <- function(gs) {
   cbind(pathway=gs, res)
 }
 tmp <- list(positive=tmpf(gsets.pos), negative=tmpf(gsets.neg))
-rio::export(tmp, "../gem_manuscript/Table S3_SARS-CoV-2-infected compared to control most consistently altered gene sets from GSEA across datasets.xlsx")
+rio::export(tmp, "Table S3_SARS-CoV-2-infected compared to control most consistently altered gene sets from GSEA across datasets.xlsx")
 ```
 
 

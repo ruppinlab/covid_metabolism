@@ -296,7 +296,7 @@ draw(hm, annotation_legend_list=lgd1, merge_legend=TRUE)
 Export tables:
 
 ```{r}
-rio::export(df.res, "../gem_manuscript/Table S4_SARS-CoV-2-infected compared to control differential flux results for each dataset.xlsx")
+rio::export(df.res, "Table S4_SARS-CoV-2-infected compared to control differential flux results for each dataset.xlsx")
 
 tmpf <- function(gs, dir=1) {
   dm <- lapply(df.res, function(x) x[match(gs, rxn), rel.diff])
@@ -324,7 +324,7 @@ tmp <- setdiff(unq(rxns2mets(recon1, which(recon1$subSystems %in% c("Inositol Ph
 tmp3 <- data.table(metabolite.id=recon1$mets[tmp], metabolite.name=recon1$metNames[tmp])
 
 tmp <- list(S5A=tmp0, S5B=tmp1, S5C=tmp2, S5D=tmp3)
-rio::export(tmp, "../gem_manuscript/Table S5_SARS-CoV-2-infected compared to control most consistently altered metabolic fluxes across datasets.xlsx")
+rio::export(tmp, "Table S5_SARS-CoV-2-infected compared to control most consistently altered metabolic fluxes across datasets.xlsx")
 ```
 
 

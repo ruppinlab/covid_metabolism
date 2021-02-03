@@ -1,0 +1,85 @@
+---
+title: "Check gene expression analysis results of Vero E6 cell remdesivir treatment data"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r}
+library(my.utils)
+library(gembox)
+library(rio)
+```
+
+```{r}
+load("../expression/de.and.gsea.res.remdesivir.RData")
+mat <- readRDS("../data/remdesivir.RDS")$tmm.cpm
+```
+
+PCA plot:
+
+```{r, fig.width=1.3, fig.height=1.2}
+tmp <- t(mat)
+plot.pca(tmp, color=colnames(mat), label=colnames(mat), label.subset=c(3,4,8,10)) + xlim(c(-75,150)) + ylim(c(-125,100)) + thm(lgd="none")
+```
+
+```{r}
+svg("pca.expr.svg", width=1.3*2, height=1.2*2)
+plot.pca(tmp, color=colnames(mat), label=colnames(mat), label.subset=c(3,4,8,10)) + xlim(c(-75,150)) + ylim(c(-125,100)) + thm(lgd="none")
+dev.off()
+```
+
+top enriched pathways of the virus+remdesivir group vs control that are not significant in virus vs control, i.e. extra unwanted pathway changes associated with remdesivir:
+```{r}
+
+tmp <- c(setdiff(gsea.res$c2vd[ES>0 & padj<0.05, pathway], gsea.res$c2v[ES>0 & padj<0.2, pathway]), setdiff(gsea.res$c2vd[ES<0 & padj<0.05, pathway], gsea.res$c2v[ES<0 & padj<0.2, pathway]))
+gsea.res$c2vd[pathway %in% tmp]
+```
+
+Below is a visualization of selected top enriched pathways of the virus+remdesivir group vs control (positive X-axis value means higher in the virus+remdesivir group, vice versa), the pathways labeled in red are those not significant in virus vs control. also significant in remdesivir (no virus) group vs control.
+
+```{r, fig.width=2.3, fig.height=1.2}
+# a visualization of top enriched pathways of virus+remdesivir vs control, including all that overlap with remdesivir vs control, plus additional top ones unique to v+r vs ctrl
+# did not specific ES direction here
+tmp <- gsea.res$c2vd[padj<0.05]
+tmp1 <- gsea.res$c2v[padj<0.2, pathway]
+tmp[, g:=as.numeric(pathway %in% tmp1)]
+tmp <- tmp[nchar(pathway)<50][order(padj,pval)]
+tmp <- rbind(tmp[g==1][1:8], tmp[g==0][1:8], tmp[pathway %in% c("KEGG_OXIDATIVE_PHOSPHORYLATION","REACTOME_CHOLESTEROL_BIOSYNTHESIS")])
+tmp <- tmp[order(NES)]
+tmp[, nlp:=-log10(padj)]
+gs <- sapply(str_split(tmp$pathway, "_"), function(x) str_to_sentence(paste(x[-1], collapse=" ")))
+tmp1 <- c("Gpcr","gpcr","Rig i","Jak stat","dna","Dna","Oas","atp","tca","i mhc","Mapk","tpx2","Ecm","Aurka")
+gs <- str_replace_all(gs, paste(tmp1,collapse="|"), function(x) toupper(x))
+tmp[, pathway:=gs]
+tmp[, pathway:=factor(pathway, levels=pathway)]
+
+p <- ggplot(tmp) +
+  ylab("NES") +
+  geom_point(aes(x=pathway, y=NES, color=nlp, size=size)) + 
+  scale_color_continuous(low="grey", high="red3", name=expression(-log[10]*P[adj])) + 
+  scale_size_continuous(name="overlap size", breaks=c(100,250,500), range=c(1,4)) +
+  geom_hline(yintercept=0, linetype="dashed", color="grey") +
+  theme_classic() +
+  thm(y.tit=9, y.txt=7, x.tit=NULL, x.txt=list(size=7,angle=30,hjust=1,color=ifelse(tmp$g==0,"red","grey20")), lgd.tit=7, lgd.txt=6, lgd.key=10, lgd.margin=c(10,0,0,0), plt.margin=c(0,0,0,40)) + theme(legend.spacing=unit(0,"pt"))
+p
+```
+
+
+Export tables:
+```{r}
+mapp <- c("c2v"="virus.vs.control", "c2vd"="virus+remdesivir.vs.control", "c2d"="remdesivir.only.vs.control", "v2vd"="virus+remdesivir.vs.virus", "d2vd"="virus+remdesivir.vs.remdesivir.only")
+tmp1 <- rbindlist(de.res, idcol="comparison")
+tmp1[, comparison:=mapp[comparison]]
+
+tmp2 <- rbindlist(gsea.res, idcol="comparison")
+tmp2[, comparison:=mapp[comparison]]
+
+tmp <- list(S8A=tmp1, S8B=tmp2)
+rio::export(tmp, "Table S8_Differential expression and GSEA results between pairs of conditions for remdesivir-treated Vero E6 cell samples.xlsx")
+```
+
+
+
