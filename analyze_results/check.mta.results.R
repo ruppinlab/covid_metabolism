@@ -2,8 +2,6 @@ source("./functions.R")
 nc <- 4L # number of CPUs/cores
 
 mta.res <- readRDS("../GEM/mta.res.RDS")
-tmp <- readRDS("../GEM_remdesivir/mta.res.RDS")
-mta.res$remdesivir <- tmp
 
 # top 10% mta predictions
 top10.mta.hits <- lapply(mta.res, get.top.hits)

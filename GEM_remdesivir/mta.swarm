@@ -1,5 +1,0 @@
-Rscript mta.R c2v
-Rscript mta.R c2vd
-Rscript mta.R c2d
-Rscript mta.R v2vd
-Rscript mta.R d2vd

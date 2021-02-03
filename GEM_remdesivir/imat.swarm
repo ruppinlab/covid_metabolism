@@ -1,4 +1,8 @@
-Rscript imat.R ctrl
-Rscript imat.R drug
-Rscript imat.R virus
-Rscript imat.R virus_drug
+Rscript run.imat.R ctrl 0
+Rscript run.imat.R drug 0
+Rscript run.imat.R virus 0
+Rscript run.imat.R virus_drug 0
+Rscript run.imat.R ctrl 0.05
+Rscript run.imat.R drug 0.05
+Rscript run.imat.R virus 0.05
+Rscript run.imat.R virus_drug 0.05

@@ -9,8 +9,8 @@ id <- commandArgs(TRUE)
 g1 <- switch(id, c2v=, c2vd=, c2d="ctrl", v2vd="virus", d2vd="drug")
 g2 <- switch(id, c2vd=, v2vd=, d2vd="virus_drug", c2v="virus", c2d="drug")
 
-imat.res1 <- readRDS(paste0("imat.res.",g1,".RDS"))
-imat.res2 <- readRDS(paste0("imat.res.",g2,".RDS"))
+imat.res1 <- readRDS(paste0("imat.res.",g1,".0.RDS"))
+imat.res2 <- readRDS(paste0("imat.res.",g2,".0.RDS"))
 
 ### run differential flux analysis:
 
