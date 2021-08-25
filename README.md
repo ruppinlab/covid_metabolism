@@ -1,14 +1,14 @@
 # covid_metabolism
 
-This repository contains the code for reproducing the analyses in:
+This repository contains the code for performing the analyses in:
 
-Cheng et al. Genome-scale metabolic modeling reveals SARS-CoV-2-induced host metabolic reprogramming and identifies metabolic antiviral targets.
+Cheng et al. Genome-scale metabolic modeling reveals SARS-CoV-2-induced host metabolic reprogramming and identifies metabolic antiviral targets. bioRxiv.
 
 ## 1. Prerequisites
 
 ### Softwares
 
-* R 3.6 (R 3.6.3 was used in our study)
+* R (version 3.6.3 was used in our study)
 * R packages
   - ImNotaGit/my.utils
   - ruppinlab/Rcplex2: required to run genome-scale metabolic modeling (GEM); otherwise may be omitted
@@ -24,46 +24,66 @@ Alternatively, one can manually download the data files from [this Google Drive 
 
 ## 2. Description of folders and files
 
-The scripts should be run in the same order as they are introduced below.
+The scripts should be run in the same order as they are introduced below. Each script should be run from the directory it is located in as the working directory.
 
-### data
+### `data`
 
 All required data should be saved in this folder.
 
 * `dnload.sh`: a bash script for downloading the required data
 * `collect.validation.data.R`: prepare the data for validating the MTA prediction
 
-### expression
+### `expression`
 
 Scripts for gene expression-level analysis: 
 
 * `de.and.gsea.R`: differential expression (DE) and gene set enrichment analysis (GSEA) between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
+* `de.and.gsea.new.R`: DE and GSEA between the SARS-CoV-2-infected samples and non-infected controls in each dataset -- modified such that DESeq2 was consistently used for most of the bulk RNA-seq datasets
 * `de.and.gsea.remdesivir.R`: DE and GSEA analysis for the Vero E6 cell remdesivir treatment data
 
-### GEM
+### `GEM`
 
-Scripts for genome-scale metabolic modeling (GEM) analysis:
+Scripts for genome-scale metabolic modeling (GEM) analysis with Recon 1:
 
 * `prepare.data.R`: prepare data for GEM
-* `imat.and.mta.R`: run iMAT and MTA on each dataset
+* `imat.and.mta.R`: run iMAT and rMTA on each dataset
 * `dflux.R`: differential flux analysis between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
-* `collect.results.R`: collect the differential flux analysis and MTA results across datasets
+* `collect.results.R`: collect the differential flux analysis and rMTA results across datasets
 
-### GEM_remdesivir
+### `GEM_Recon3D`
 
-Scripts for GEM analysis on the Vero E6 cell remdesivir treatment data
+Scripts for GEM analysis with Recon 3D:
+
+* `prepare.data.R`: prepare data for GEM
+* `imat.and.mta.R`: run iMAT and rMTA on each dataset
+* `dflux.R`: differential flux analysis between the SARS-CoV-2-infected samples and non-infected controls in each dataset 
+* `collect.results.R`: collect the differential flux analysis and rMTA results across datasets
+
+### `GEM_remdesivir`
+
+Scripts for GEM analysis on the Vero E6 cell remdesivir treatment data with Recon 1:
 
 * `prepare.data.R`: prepare data for GEM
 * `imat.R`: run iMAT for each experimental group
-* `mta.R`: run MTA for pairs of experimental groups
+* `mta.R`: run rMTA for pairs of experimental groups
 * `dflux.R`: differential flux analysis between pairs of experimental groups
 * `collect.results.R`: collect the differential flux analysis results
 
-### analyze_results
+### `GEM_remdesivir_Recon3D`
 
-Scripts and R notebooks for inspecting the results from various analyses and for validating the MTA predictions:
+Scripts for GEM analysis on the Vero E6 cell remdesivir treatment data with Recon 3D:
+
+* `prepare.data.R`: prepare data for GEM
+* `imat.R`: run iMAT for each experimental group
+* `mta.R`: run rMTA for pairs of experimental groups
+* `dflux.R`: differential flux analysis between pairs of experimental groups
+* `collect.results.R`: collect the differential flux analysis results
+
+### `analyze_results`
+
+Scripts and R notebooks for inspecting the results from various analyses and for validating the rMTA predictions:
 
 * `functions.R`: various functions, will be sourced in check.mta.results.R and check.mta.results.remdesivir.R
-* `check.mta.results.R`: various validations and pathway enrichment analysis of MTA results
-* `check.mta.results.remdesivir.R`: various validations and pathway enrichment analysis of MTA results for predicting combinatory target with remdesivir
+* `check.mta.results.R`: various validations and pathway enrichment analysis of rMTA results
+* `check.mta.results.remdesivir.R`: various validations and pathway enrichment analysis of rMTA results for predicting combinatory target with remdesivir
 * Various `.Rmd` files: R notebook for inspecting and visualizing results from different analyses, see their contents for details
