@@ -1,0 +1,12 @@
+Rscript dflux.R NHBE
+Rscript dflux.R Calu-3
+Rscript dflux.R A549
+Rscript dflux.R Vero
+Rscript dflux.R 293T
+Rscript dflux.R Caco-2
+Rscript dflux.R Swab.Butler
+Rscript dflux.R Swab.Lieberman
+Rscript dflux.R BALF
+Rscript dflux.R SC.Liao
+Rscript dflux.R SC.Chua.Basal
+Rscript dflux.R SC.Chua.Ciliated
