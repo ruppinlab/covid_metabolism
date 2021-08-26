@@ -1,0 +1,5 @@
+Rscript dflux.R c2v
+Rscript dflux.R c2vd
+Rscript dflux.R c2d
+Rscript dflux.R v2vd
+Rscript dflux.R d2vd
